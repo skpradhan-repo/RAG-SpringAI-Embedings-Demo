@@ -1,0 +1,358 @@
+
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>LinkedIn Article Agent Prompt — RAG Assistant</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+    color: #1f2328;
+    background: #ffffff;
+    padding: 40px 24px 60px;
+  }
+
+  .wrapper {
+    max-width: 760px;
+    margin: 0 auto;
+  }
+
+  /* Header */
+  .header {
+    border-bottom: 2px solid #e5e7eb;
+    padding-bottom: 20px;
+    margin-bottom: 32px;
+  }
+  .header .badge {
+    display: inline-block;
+    background: #3b82d4;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    padding: 3px 10px;
+    border-radius: 3px;
+    margin-bottom: 12px;
+  }
+  .header h1 {
+    font-size: 22px;
+    font-weight: 700;
+    color: #1f2328;
+    margin-bottom: 6px;
+  }
+  .header p {
+    color: #57606a;
+    font-size: 13px;
+  }
+
+  /* Section headings */
+  h2 {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #57606a;
+    margin-top: 36px;
+    margin-bottom: 12px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  /* Prompt block */
+  .prompt-box {
+    background: #f7f8fa;
+    border: 1px solid #e5e7eb;
+    border-left: 4px solid #3b82d4;
+    border-radius: 6px;
+    padding: 24px 28px;
+    font-size: 13.5px;
+    line-height: 1.75;
+    color: #1f2328;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  /* Inline code / accent */
+  .highlight {
+    background: #eef2ff;
+    color: #3b4fd4;
+    font-family: "SF Mono", "Consolas", monospace;
+    font-size: 12px;
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
+
+  /* Context cards */
+  .cards {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-top: 0;
+  }
+  @media (max-width: 540px) {
+    .cards { grid-template-columns: 1fr; }
+  }
+  .card {
+    background: #f7f8fa;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    padding: 14px 16px;
+  }
+  .card .card-title {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #57606a;
+    margin-bottom: 8px;
+  }
+  .card ul {
+    list-style: none;
+    padding: 0;
+  }
+  .card ul li {
+    font-size: 13px;
+    color: #1f2328;
+    padding: 2px 0;
+  }
+  .card ul li::before {
+    content: "→ ";
+    color: #3b82d4;
+    font-weight: 600;
+  }
+
+  /* Instructions table */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    margin-top: 0;
+  }
+  th {
+    text-align: left;
+    background: #f7f8fa;
+    border: 1px solid #e5e7eb;
+    padding: 8px 12px;
+    font-weight: 600;
+    color: #57606a;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  td {
+    border: 1px solid #e5e7eb;
+    padding: 8px 12px;
+    vertical-align: top;
+  }
+  tr:nth-child(even) td { background: #f7f8fa; }
+
+  /* Tips */
+  .tip {
+    background: #fff8e1;
+    border: 1px solid #f0d060;
+    border-radius: 5px;
+    padding: 10px 14px;
+    font-size: 12.5px;
+    color: #5a4a00;
+    margin-top: 10px;
+  }
+
+  /* Footer */
+  .footer {
+    margin-top: 56px;
+    padding-top: 16px;
+    border-top: 1px solid #e5e7eb;
+    text-align: center;
+    font-size: 12px;
+    color: #57606a;
+  }
+</style>
+</head>
+<body>
+<div class="wrapper">
+
+  
+  <div class="header">
+    <div class="badge">Agent Prompt</div>
+    <h1>LinkedIn Article Generator — Enterprise RAG Assistant</h1>
+    <p>Paste this prompt into any AI agent (ChatGPT, Claude, Gemini, etc.) to generate a polished LinkedIn article about this project.</p>
+  </div>
+
+  
+  <h2>Project Context (fed to the agent)</h2>
+  <div class="cards">
+    <div class="card">
+      <div class="card-title">What Was Built</div>
+      <ul>
+        <li>Spring Boot 3.4.3 + Spring AI 1.0.0-M6</li>
+        <li>PostgreSQL 16 + pgvector (HNSW, Cosine)</li>
+        <li>Nomic Embed Text — 768-dim via Ollama</li>
+        <li>Swappable LLMs: Qwen / Llama3 / Gemma</li>
+        <li>Docker Compose infrastructure</li>
+        <li>Apache Tika multi-format file reader</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-title">Application Code</div>
+      <ul>
+        <li>RagController — 3 REST endpoints</li>
+        <li>DocumentIngestionService — Tika + TokenTextSplitter</li>
+        <li>RagQueryService — similarity search + PromptTemplate + ChatClient</li>
+        <li>RagDto — typed request/response DTOs</li>
+        <li>GlobalExceptionHandler — validation + IO + generic errors</li>
+        <li>application.yml — fully externalised config</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-title">Ingestion Pipeline Details</div>
+      <ul>
+        <li>Chunk size: 800 tokens, overlap: 100</li>
+        <li>Metadata: title, category, filename, contentType</li>
+        <li>Source tagging: raw_text vs file upload</li>
+        <li>Auto schema init for vector_store table</li>
+        <li>Returns: chunksIngested count + status</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-title">Query / RAG Pipeline Details</div>
+      <ul>
+        <li>TopK: 4, similarity threshold: 0.60</li>
+        <li>Strict RAG prompt — answers only from context</li>
+        <li>Graceful "no context" fallback message</li>
+        <li>Returns: answer + source docs + scores</li>
+        <li>Configurable topK &amp; threshold per request</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-title">Challenges Solved</div>
+      <ul>
+        <li>pgvector 768 vs 1536 dim mismatch</li>
+        <li>Ambiguous EmbeddingModel bean conflict</li>
+        <li>Java 17 vs 21 compiler mismatch</li>
+        <li>Port 8081 collision on restart</li>
+        <li>Ollama model not found (500 error)</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-title">API Endpoints</div>
+      <ul>
+        <li>POST /api/v1/rag/ingest/text — raw text</li>
+        <li>POST /api/v1/rag/ingest/file — multipart file</li>
+        <li>POST /api/v1/rag/ask — full RAG Q&amp;A</li>
+        <li>Bean validation on all request bodies</li>
+        <li>201 Created for ingestion, 200 OK for query</li>
+      </ul>
+    </div>
+  </div>
+
+  
+  <h2>How to Use</h2>
+  <table>
+    <thead>
+      <tr><th>Parameter</th><th>What to provide</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Tone</strong></td><td>Choose one: <em>Technical &amp; detailed</em> / <em>Conversational &amp; storytelling</em> / <em>Concise thought-leadership</em></td></tr>
+      <tr><td><strong>Length</strong></td><td>Short post (~300 words) · Standard article (~600 words) · Long-form (~1000 words)</td></tr>
+      <tr><td><strong>Audience</strong></td><td>Java engineers · AI/ML practitioners · Engineering managers · General tech audience</td></tr>
+      <tr><td><strong>Author voice</strong></td><td>Optionally paste 2–3 sentences of your own writing so the agent can match your style</td></tr>
+    </tbody>
+  </table>
+  <div class="tip">
+    Tip — after generating, ask the agent: <em>"Add a 'What I would do differently' section"</em> or <em>"Shorten to 5 punchy bullet-point sections"</em> to iterate quickly.
+  </div>
+
+  
+  <h2>The Prompt — Copy Everything Below</h2>
+  <div class="prompt-box">You are an expert LinkedIn content writer specialising in software engineering and AI/ML articles. Your task is to write a compelling, authentic LinkedIn article (or post) about a project I recently built from scratch called the **Enterprise RAG Assistant**.
+
+---
+
+## ROLE &amp; GOAL
+Write a [TONE: technical / conversational / thought-leadership] LinkedIn article of approximately [LENGTH: ~300 / ~600 / ~1000 words] targeted at [AUDIENCE: Java engineers / AI practitioners / engineering managers / general tech].
+
+The article must feel like it was written by the developer who built this — with genuine insight, honest lessons, and real technical depth. Avoid buzzword stuffing and hype. Every claim must be grounded in the technical details below.
+
+---
+
+## PROJECT OVERVIEW
+I built an end-to-end **Enterprise RAG (Retrieval-Augmented Generation) Assistant** using the Java Spring ecosystem — fully local, no third-party AI API, no data leaves the machine.
+
+**Core purpose:** Allow companies to upload their private documents (PDFs, DOCX, TXT, Markdown) and then ask natural language questions that are answered accurately and cited from those documents — using a local LLM.
+
+---
+
+## TECH STACK
+- **Framework:** Spring Boot 3.4.3 + Spring AI 1.0.0-M6
+- **Vector Database:** PostgreSQL 16 + pgvector extension (HNSW index, cosine distance)
+- **Embedding Model:** nomic-embed-text (768-dimensional vectors, runs locally via Ollama)
+- **Chat LLMs (swappable):** Qwen3.5:9b / Llama3.2 / Gemma4:12b — all local via Ollama
+- **File Parsing:** Apache Tika (supports PDF, DOCX, TXT, MD and more)
+- **Infrastructure:** Docker Compose (PostgreSQL + pgvector container + Ollama container)
+- **Build:** Maven 3.9+, Java 17 LTS
+
+---
+
+## WHAT THE APPLICATION ACTUALLY DOES
+
+### Ingestion Pipeline (DocumentIngestionService)
+1. Accepts raw text (with title/category/metadata) OR uploaded files (PDF, DOCX, TXT, etc.)
+2. Files are parsed by Apache Tika's TikaDocumentReader — extracts clean text from any format
+3. Documents are split into chunks using TokenTextSplitter: chunk size 800 tokens, overlap 100 tokens
+4. Each chunk is enriched with metadata: filename, category, contentType, source type (raw_text or file)
+5. Chunks are passed to PgVectorStore, which calls Nomic Embed via Ollama to generate 768-dim vectors
+6. Vectors + text are stored in PostgreSQL's vector_store table with an HNSW index
+7. Returns: { status, chunksIngested, documentName }
+
+### Query / RAG Pipeline (RagQueryService)
+1. User sends a natural language question (with optional topK and similarityThreshold params)
+2. The question is embedded by Nomic Embed (same model, same 768-dim space)
+3. PgVectorStore runs a cosine similarity search — returns Top-K (default: 4) chunks above threshold (default: 0.60)
+4. Retrieved chunks are formatted into a context block
+5. A strict RAG PromptTemplate is rendered: "Answer ONLY from the provided context. If insufficient, say so."
+6. ChatClient sends the rendered prompt to the local LLM (Qwen / Llama / Gemma)
+7. Returns: { question, answer, sources[] } — sources include document ID, content, similarity score, and metadata
+
+### REST API (RagController)
+- POST /api/v1/rag/ingest/text — ingest raw text with metadata
+- POST /api/v1/rag/ingest/file — multipart file upload (PDF, DOCX, etc.)
+- POST /api/v1/rag/ask — full RAG Q&amp;A pipeline
+
+### Supporting Code
+- **RagDto:** Typed, validated request/response DTOs using Lombok + Jakarta Validation (@NotBlank)
+- **GlobalExceptionHandler (@RestControllerAdvice):** Handles validation errors (400), IO errors (500), and unexpected exceptions — returns structured JSON with timestamp, status, and error detail — never exposes stack traces to clients
+- **application.yml:** Fully externalised config — vector dimensions (768), HNSW index type, top-K, similarity threshold, chunk size, chunk overlap, Ollama base URL, DB credentials via env vars
+
+---
+
+## REAL CHALLENGES &amp; LESSONS LEARNED
+1. **pgvector dimension mismatch:** nomic-embed-text produces 768-dim vectors; if the table was previously created for OpenAI (1536-dim), pgvector silently rejects inserts with "different vector dimensions" — fix: set spring.ai.vectorstore.pgvector.dimensions: 768 and DROP the old table
+2. **Ambiguous EmbeddingModel bean:** Including both spring-ai-ollama and spring-ai-openai starters causes Spring to auto-configure two EmbeddingModel beans — Spring can't pick one, app fails to start — fix: keep only the ollama starter, or annotate the correct bean with @Primary
+3. **Java version mismatch:** pom.xml configured for Java 21 but local JDK was 17 — "release version 21 not supported" — fix: pin to java.version 17, fully supported by Spring Boot 3.4.x
+4. **Port 8081 already in use:** Background process from a previous run held the port — fix: kill owning process via Get-NetTCPConnection / lsof
+5. **Ollama model not found:** Chat model name in application.yml didn't match the pulled model — 500 errors until verified via curl http://127.0.0.1:11434/api/tags
+
+---
+
+## TONE &amp; STYLE INSTRUCTIONS
+- Write in first person ("I built", "I learned", "we discovered")
+- Be honest about the gotchas and debugging effort — authenticity builds credibility
+- Use short paragraphs and white space — LinkedIn readers skim
+- Include a clear hook in the first 2 lines (visible before "see more")
+- End with an open question or call to engagement ("Have you built RAG on the JVM? I'd love to compare notes.")
+- Add 8–12 relevant hashtags at the end (Java, SpringBoot, SpringAI, RAG, GenerativeAI, LLM, Ollama, pgvector, AIEngineering, EnterpriseAI, BackendEngineering, PrivateAI)
+
+---
+
+## OUTPUT FORMAT
+Produce the article as plain text, ready to paste directly into LinkedIn. Use blank lines between paragraphs. Use emoji sparingly (1–2 max, only if the tone is conversational). Do NOT use markdown headers or bullet formatting in the output — LinkedIn renders plain text only.</div>
+
+  <div class="footer">Made with IBM Bob</div>
+</div>
+</body>
+</html>

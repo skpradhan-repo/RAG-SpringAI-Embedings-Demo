@@ -1,0 +1,42 @@
+server:
+  port: 8081
+  address: 127.0.0.1
+
+spring:
+  application:
+    name: rag-assistant
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:127.0.0.1}:${DB_PORT:5432}/${DB_NAME:ragdb}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+
+  ai:
+    # Vector store configuration using PostgreSQL + pgvector
+    vectorstore:
+      pgvector:
+        index-type: HNSW
+        distance-type: COSINE_DISTANCE
+        dimensions: 768 # nomic-embed-text generates 768-dimensional vectors
+        initialize-schema: true
+        table-name: vector_store
+
+    # Embedding model configuration (Nomic Embed via Ollama)
+    ollama:
+      base-url: ${OLLAMA_BASE_URL:http://127.0.0.1:11434}
+      embedding:
+        options:
+          model: nomic-embed-text
+      chat:
+        options:
+          model: gemma:2b
+
+
+rag:
+  retrieval:
+    top-k: 4
+    similarity-threshold: 0.60
+  chunking:
+    chunk-size: 800
+    chunk-overlap: 100
