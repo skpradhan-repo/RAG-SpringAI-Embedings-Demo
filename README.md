@@ -8,26 +8,6 @@ An end-to-end Enterprise Retrieval-Augmented Generation (RAG) assistant built us
 
 ### Ingestion & Query Flow
 
-```mermaid
-flowchart TD
-    subgraph Ingestion ["1. Document Ingestion Pipeline"]
-        A[Private / Company Data\nPDF, DOCX, TXT, Raw Text] --> B[Document Loader / Tika Reader]
-        B --> C[Token Text Splitter\nChunk size: 800 | Overlap: 100]
-        C --> D[Embedding Model\nNomic Embed: 768-dim]
-        D --> E[(PostgreSQL + pgvector\nHNSW Cosine Distance)]
-    end
-
-    subgraph Query ["2. Retrieval & Generation Pipeline"]
-        F[User Question] --> G[Embedding Model\nNomic Embed]
-        G --> H[Vector Similarity Search\nTop-K: 4 | Threshold: 0.60]
-        E <--> H
-        H --> I[Retrieve Relevant Context Chunks]
-        I --> J[Prompt Augmentation\nSystem Prompt + Context + Question]
-        J --> K[LLM Orchestration\nQwen / Llama / Gemma]
-        K --> L[Final Answer + Source Citations]
-    end
-```
-
 ### Complete Sequence Diagram
 
 ```mermaid
