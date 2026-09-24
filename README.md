@@ -369,7 +369,18 @@ curl -X POST http://localhost:8081/api/v1/rag/ask \
 
 ## 🔧 Troubleshooting Guide & Known Solutions
 
-### 1. Port 8081 Already in Use (`Web server failed to start`)
+### 1. Spring Boot Cannot Find `docker` Binary (`DockerProcessStartException`)
+- **Symptom:**
+  ```
+  DockerProcessStartException: Unable to start docker process. Is docker correctly installed?
+  Caused by: java.io.IOException: Cannot run program "docker": CreateProcess error=2
+  ```
+- **Cause:** Spring Boot's `DockerCli` always probes for a binary literally named `docker` using Java's `ProcessBuilder`, which calls the Win32 `CreateProcess` API. This API only resolves `.exe` and `.com` extensions — `.cmd` and `.bat` shims are invisible to it. Setting `spring.docker.compose.command=podman` does **not** bypass this initial binary probe.
+- **Fix:** Create a native `docker.exe` shim (see [Prerequisites: One-time Podman Shim Setup](#prerequisites-one-time-podman-shim-setup-windows-only)) once. It delegates every call to `podman` transparently.
+
+---
+
+### 2. Port 8081 Already in Use (`Web server failed to start`)
 - **Symptom:** `org.springframework.context.ApplicationContextException: Failed to start bean 'webServerStartStop'` / `Port 8081 was already in use.`
 - **Cause:** A previous instance of the application is running in the background.
 - **Fix:** Kill the process holding port 8081:
@@ -385,7 +396,7 @@ curl -X POST http://localhost:8081/api/v1/rag/ask \
 
 ---
 
-### 2. Ollama Model Not Found (500 Internal Server Error)
+### 3. Ollama Model Not Found (500 Internal Server Error)
 - **Symptom:** `500 Internal Server Error` when calling `/api/v1/rag/ask`.
 - **Cause:** The chat model configured in `application.yml` is not installed in the local Ollama instance.
 - **Fix:** Check available models and ensure the model in `application.yml` matches:
@@ -400,7 +411,7 @@ curl -X POST http://localhost:8081/api/v1/rag/ask \
 
 ---
 
-### 3. Ambiguous `EmbeddingModel` Bean Conflict
+### 4. Ambiguous `EmbeddingModel` Bean Conflict
 - **Symptom:**
   ```
   UnsatisfiedDependencyException: No qualifying bean of type 'org.springframework.ai.embedding.EmbeddingModel' available:
@@ -411,14 +422,14 @@ curl -X POST http://localhost:8081/api/v1/rag/ask \
 
 ---
 
-### 4. Java Version Mismatch (`release 21 not supported`)
+### 5. Java Version Mismatch (`release 21 not supported`)
 - **Symptom:** `Fatal error compiling: error: release version 21 not supported`.
 - **Cause:** Local environment is JDK 17, but `pom.xml` was set to Java 21.
 - **Fix:** Keep `<java.version>17</java.version>` in `pom.xml`. Spring Boot 3.4.x is fully supported on Java 17 LTS.
 
 ---
 
-### 5. pgvector Vector Dimension Mismatch
+### 6. pgvector Vector Dimension Mismatch
 - **Symptom:** `ERROR: different vector dimensions 1536 and 768`.
 - **Cause:** `nomic-embed-text` produces **768-dimensional** vectors. If the table was previously initialized for OpenAI (1536-dim), pgvector rejects the insert.
 - **Fix:** Ensure `spring.ai.vectorstore.pgvector.dimensions: 768` in `application.yml`. To reset the schema:
@@ -432,7 +443,7 @@ curl -X POST http://localhost:8081/api/v1/rag/ask \
 
 ```text
 rag-assistant/
-├── docker-compose.yml              # PostgreSQL + pgvector & Ollama containers
+├── compose.yml                     # PostgreSQL + pgvector & Ollama containers (auto-managed by Spring Boot)
 ├── pom.xml                         # Maven build file with Spring AI dependencies
 ├── README.md                       # Comprehensive guide & API documentation
 └── src/
