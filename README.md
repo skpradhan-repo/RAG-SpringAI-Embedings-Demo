@@ -64,45 +64,207 @@ sequenceDiagram
 - **Vector Database**: PostgreSQL 16 + `pgvector`
 - **Embedding Model**: `nomic-embed-text` (768 dimensions via Ollama)
 - **Chat LLM**: `qwen3.5:9b` / `llama3.2` / `gemma4:12b` (via Ollama)
-- **Containerization**: Docker & Docker Compose
+- **Containerization**: Podman (Docker-compatible)
 
 ---
 
 ## 🚀 Quick Start Guide
 
-### Step 1: Start Infrastructure (Docker Compose)
-Inside the `rag-assistant` directory, launch PostgreSQL with pgvector and Ollama:
+> **This project uses Spring Boot's Docker Compose integration** — you do **not** need to start containers manually. One command starts everything. See [Infrastructure Bootstrap](#-infrastructure-bootstrap--the-spring-boot-way) for the full story.
 
-```bash
-docker compose up -d
+### Prerequisites: One-time Podman Shim Setup (Windows only)
+
+Spring Boot's Docker Compose support internally calls `docker` (the binary name). Since this project uses **Podman** instead of Docker, a one-time shim is needed to make `docker` resolve to `podman`. The shim must be a `.exe` because Java's `ProcessBuilder` uses the Win32 `CreateProcess` API which only resolves `.exe`/`.com` — it ignores `.cmd` and `.bat` files.
+
+Run this **once** in PowerShell (requires no admin rights):
+
+```powershell
+# Compile a native docker.exe shim that delegates to podman
+$src = @'
+using System;
+using System.Diagnostics;
+using System.Text;
+
+class Docker {
+    static int Main(string[] args) {
+        var sb = new StringBuilder();
+        foreach (var a in args) {
+            if (a.IndexOf(' ') >= 0 || a.IndexOf('"') >= 0)
+                sb.Append('"').Append(a.Replace("\"","\\\"")).Append('"');
+            else
+                sb.Append(a);
+            sb.Append(' ');
+        }
+        var psi = new ProcessStartInfo();
+        psi.FileName = "podman";
+        psi.Arguments = sb.ToString().TrimEnd();
+        psi.UseShellExecute = false;
+        var p = Process.Start(psi);
+        p.WaitForExit();
+        return p.ExitCode;
+    }
+}
+'@
+$tmpSrc = "$env:TEMP\docker_shim.cs"
+$outExe = "$env:USERPROFILE\.local\bin\docker.exe"
+New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.local\bin" | Out-Null
+Set-Content -Path $tmpSrc -Value $src -Encoding UTF8
+& "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe" /out:$outExe /target:exe /nologo $tmpSrc
+Write-Host "Shim created at $outExe"
 ```
 
-Verify containers are healthy:
-```bash
-docker ps
+> **Why not `docker.cmd`?**
+> PowerShell resolves `.cmd` via `PATHEXT`, but Java's `ProcessBuilder` calls `CreateProcess` directly — it will only find `docker.exe`. A `.cmd` shim works in your terminal but is invisible to the JVM.
+
+Make sure `%USERPROFILE%\.local\bin` is on your `PATH` (it usually is on developer machines). Verify with:
+```powershell
+docker version --format '{{.Client.Version}}'
+# Expected: 5.8.1  (your Podman version)
 ```
 
-### Step 2: Download Models in Ollama
-Pull the `nomic-embed-text` embedding model and the chat model:
-
-```bash
-docker exec -it rag-ollama ollama pull nomic-embed-text
-docker exec -it rag-ollama ollama pull qwen3.5:9b
-```
-*(If you have Ollama installed locally on Windows, simply run `ollama pull nomic-embed-text` and `ollama pull qwen3.5:9b`)*
-
-### Step 3: Build the Project
-
-```bash
-mvn clean package -DskipTests
-```
-
-### Step 4: Run the Application
+### Run the Application
 
 ```bash
 mvn spring-boot:run
 ```
-The server will start listening on `http://localhost:8081`.
+
+That's it. Spring Boot starts the containers, waits for them to be healthy, wires the datasource, and launches the app — all in one command. The server listens on `http://127.0.0.1:8081`.
+
+---
+
+## 🏗️ Infrastructure Bootstrap — The Spring Boot Way
+
+### The Old Way: Manual Container Management
+
+Before this setup, running the project required three separate manual steps and knowledge of which containers to start and in what order:
+
+```
+# Terminal 1 — infrastructure
+podman compose up -d
+podman ps                          # manually verify health
+
+# Terminal 2 — pull models (only if first time)
+podman exec -it rag-ollama ollama pull nomic-embed-text
+podman exec -it rag-ollama ollama pull gemma:2b
+
+# Terminal 3 — application
+mvn spring-boot:run
+```
+
+**Problems with this approach:**
+- Three separate steps, easy to forget one or run them out of order
+- Application starts even if Postgres hasn't finished initializing → connection errors at startup
+- Containers keep running after the app stops → resource waste, stale state between runs
+- Every new team member needs to know which `compose.yml` to use and in what order to run things
+- CI/local parity is the developer's responsibility
+
+### The New Way: Spring Boot Bootstraps Everything
+
+With `spring-boot-docker-compose` (added to [`pom.xml`](pom.xml)), the entire infrastructure lifecycle is managed by Spring Boot itself:
+
+```
+mvn spring-boot:run          ← the only command you need
+```
+
+What happens under the hood:
+
+```
+Spring Boot starts
+  │
+  ├─► Detects compose.yml in project root
+  │
+  ├─► Runs: docker compose -f compose.yml up -d
+  │         (docker → shim → podman compose)
+  │         Starts: postgres-pgvector, ollama
+  │
+  ├─► Polls Postgres healthcheck until passing
+  │         test: pg_isready -U postgres -d ragdb
+  │         interval: 5s, retries: 5
+  │
+  ├─► Spring auto-configures DataSource, PgVectorStore
+  │
+  ├─► Application context loads fully
+  │
+  └─► Server ready on http://127.0.0.1:8081
+
+Ctrl+C
+  └─► Spring Boot runs: docker compose down
+        Stops and removes containers cleanly
+```
+
+### What Makes This Work
+
+#### 1. The Maven dependency
+
+```xml
+<!-- pom.xml -->
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-docker-compose</artifactId>
+    <optional>true</optional>   <!-- dev-only, not bundled in the final jar -->
+</dependency>
+```
+
+Marking it `<optional>true</optional>` means it is only active during local development (`mvn spring-boot:run` or IDE). It is excluded from the final deployable jar — production environments use their own infrastructure.
+
+#### 2. The configuration in `application.yml`
+
+```yaml
+spring:
+  docker:
+    compose:
+      enabled: true
+      file: compose.yml               # explicit path, no guessing
+      lifecycle-management: start-and-stop   # start on boot, stop on exit
+      skip-in-tests: true             # never spin up containers during tests
+```
+
+| Property | Value | Effect |
+|---|---|---|
+| `enabled` | `true` | Activates the Docker Compose lifecycle hook |
+| `file` | `compose.yml` | Explicit compose file — no ambiguity with `docker-compose.yml` |
+| `lifecycle-management` | `start-and-stop` | Containers start with the app and stop when it shuts down |
+| `skip-in-tests` | `true` | Unit/integration tests don't spin up real containers |
+
+#### 3. The Postgres healthcheck in `compose.yml`
+
+```yaml
+healthcheck:
+  test: ["CMD-SHELL", "pg_isready -U postgres -d ragdb"]
+  interval: 5s
+  timeout: 5s
+  retries: 5
+```
+
+Spring Boot waits for this healthcheck to pass before proceeding to load the application context. This means the `DataSource` bean is only created after Postgres is **actually ready** — no race conditions, no `Connection refused` errors at startup.
+
+#### 4. The Podman shim (`docker.exe`)
+
+Spring Boot's `DockerCli` class probes for `docker` binary at startup using Java's `ProcessBuilder` (`docker version --format {{.Client.Version}}`). It ignores the `spring.docker.compose.command` property at this detection stage. On Windows, `ProcessBuilder` uses the Win32 `CreateProcess` API which only resolves `.exe` and `.com` — not `.cmd` or `.bat`.
+
+The shim placed at `%USERPROFILE%\.local\bin\docker.exe` is a compiled C# executable that forwards all arguments verbatim to `podman`:
+
+```
+Spring Boot: docker version --format {{.Client.Version}}
+  → shim: podman version --format {{.Client.Version}}
+  → 5.8.1  ✓
+
+Spring Boot: docker compose -f compose.yml up -d
+  → shim: podman compose -f compose.yml up -d  ✓
+```
+
+### Side-by-side Comparison
+
+| | Manual (`podman compose up -d`) | Spring Boot Auto-Bootstrap |
+|---|---|---|
+| **Commands to run** | 3+ (compose up, verify, then run app) | 1 (`mvn spring-boot:run`) |
+| **Startup order** | Manual responsibility | Guaranteed by Spring Boot |
+| **Health gating** | Manual (`podman ps`, eyeball it) | Automatic — app context waits for healthcheck |
+| **Shutdown cleanup** | Manual (`podman compose down`) | Automatic on `Ctrl+C` |
+| **New developer setup** | Must know which compose file and order | Just run the app |
+| **Test isolation** | Risk of tests hitting real containers | `skip-in-tests: true` |
+| **Production impact** | N/A — your responsibility | Zero — `<optional>true</optional>` excluded from jar |
+
 
 ---
 
